@@ -1,17 +1,48 @@
 services:
+  mysql:
+    image: mysql:8.4
+    container_name: deployment-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: "${DB_NAME:-app_db}"
+      MYSQL_USER: "${DB_USER:-app_user}"
+      MYSQL_PASSWORD: "${DB_PASSWORD:-app_password}"
+      MYSQL_ROOT_PASSWORD: "${DB_ROOT_PASSWORD:-root_password}"
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   backend:
     build:
       context: ./backend
       args:
+        DB_TYPE: "${DB_TYPE:-mysql}"
+        DB_HOST: "${DB_HOST:-mysql}"
+        DB_PORT: "${DB_PORT:-3306}"
+        DB_USER: "${DB_USER:-app_user}"
+        DB_PASSWORD: "${DB_PASSWORD:-app_password}"
+        DB_NAME: "${DB_NAME:-app_db}"
         CORS_ORIGIN: "${CORS_ORIGIN:-http://localhost:8080,http://127.0.0.1:8080,http://localhost,http://127.0.0.1,http://localhost:5173}"
     ports:
       - "3000:3000"
     environment:
       PORT: 3000
-      SQLITE_PATH: /data/database.sqlite
+      DB_TYPE: "${DB_TYPE:-mysql}"
+      DB_HOST: "${DB_HOST:-mysql}"
+      DB_PORT: "${DB_PORT:-3306}"
+      DB_USER: "${DB_USER:-app_user}"
+      DB_PASSWORD: "${DB_PASSWORD:-app_password}"
+      DB_NAME: "${DB_NAME:-app_db}"
       CORS_ORIGIN: "${CORS_ORIGIN:-http://localhost:8080,http://127.0.0.1:8080,http://localhost,http://127.0.0.1,http://localhost:5173}"
-    volumes:
-      - backend-data:/data
+    depends_on:
+      mysql:
+        condition: service_healthy
 
   frontend:
     build:
@@ -26,4 +57,4 @@ services:
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:3000}
 
 volumes:
-  backend-data:
+  mysql-data:
